@@ -1,5 +1,19 @@
 #include <stdio.h>
 
+int func1(int *a)
+{
+	int ret = 0;
+	__asm__ __volatile__ (
+		"mov r1, #99;"
+		"str r1, [%1];"
+		"mov %0, #88;"
+		: "=r"(ret)		// Output operands
+		: "r"(a)		// Input operands
+		:				// Overwritten registers
+	);
+	return ret;
+}
+
 int add(int a, int b)
 {
 	int ret = 0;
@@ -38,15 +52,18 @@ void copy(int *src, int *dst)
 
 int main()
 {
-	printf("Hello World\n");
-	int ret;
+	int a, b, ret;
+
+	ret = func1(&a);
+	printf("ret = %d, a = %d\n", ret, a);
+
 	ret = add(1, 2);
 	printf("ret = %d\n", ret);
+
 	ret = add_label(1, 2);
 	printf("ret = %d\n", ret);
 
-	int a = 10;
-	int b;
+	a = 10; b = 0;
 	copy(&a, &b);
 	printf("a = %d b = %d\n", a, b);
 }

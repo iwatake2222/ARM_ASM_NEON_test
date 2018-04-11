@@ -55,6 +55,20 @@ ret = 88, a = 99
 ```c:inline.c
 #include <stdio.h>
 
+int func1(int *a)
+{
+	int ret = 0;
+	__asm__ __volatile__ (
+		"mov r1, #99;"
+		"str r1, [%1];"
+		"mov %0, #88;"
+		: "=r"(ret)		// Output operands
+		: "r"(a)		// Input operands
+		:				// Overwritten registers
+	);
+	return ret;
+}
+
 int add(int a, int b)
 {
 	int ret = 0;
@@ -93,14 +107,18 @@ void copy(int *src, int *dst)
 
 int main()
 {
-	int ret;
+	int a, b, ret;
+
+	ret = func1(&a);
+	printf("ret = %d, a = %d\n", ret, a);
+
 	ret = add(1, 2);
 	printf("ret = %d\n", ret);
+
 	ret = add_label(1, 2);
 	printf("ret = %d\n", ret);
 
-	int a = 10;
-	int b;
+	a = 10; b = 0;
 	copy(&a, &b);
 	printf("a = %d b = %d\n", a, b);
 }
@@ -109,6 +127,7 @@ int main()
 ```sh:ビルドコマンドと実行結果
 gcc inline.c
 ./a.out
+ret = 88, a = 99
 ret = 3
 ret = 3
 a = 10 b = 10
@@ -130,15 +149,13 @@ NEONユニットは32本の64-bit SIMDレジスタ(D0-D31)を持つ。16本x128-
 
 void add()
 {
-	uint8_t a[8];	// set to d0_low and d0_high
-	uint8_t b[8];	// set to d1_low and d1_high
+	uint8_t a[8];	// d0
+	uint8_t b[8];	// d1
 	uint8_t c[8];	// result
-	memset(a, 0x11, sizeof(a));
+	memset(a, 0x12, sizeof(a));
 	a[2] = 0xEE;	// 飽和確認用
-	memset(b, 0x22, sizeof(b));
+	memset(b, 0x34, sizeof(b));
 	memset(c, 0x00, sizeof(c));
-
-	printf("%08X_%08X\n%08X_%08X\n\n", *(uint32_t*)&a[4], *(uint32_t*)&a[0], *(uint32_t*)&b[4], *(uint32_t*)&b[0]);
 
 	__asm__ __volatile__ (
 		"vld1.8 {d0}, [%0];"	// d0 <- a
@@ -150,7 +167,9 @@ void add()
 		: 							// Overwritten registers
 	);
 
-	printf("%08X_%08X\n", *(uint32_t*)&c[4], *(uint32_t*)&c[0]);
+	for (int i = 0; i < 8; i++)
+		printf("%02X + %02X = %02X\n", a[i], b[i], c[i]);
+
 	return;
 }
 
@@ -163,10 +182,14 @@ int main()
 ```sh:ビルドコマンドと実行結果
 gcc simd.c -mfpu=neon
 ./a.out
-11111111_11EE1111
-22222222_22222222
-
-33333333_33FF3333
+12 + 34 = 46
+12 + 34 = 46
+EE + 34 = FF
+12 + 34 = 46
+12 + 34 = 46
+12 + 34 = 46
+12 + 34 = 46
+12 + 34 = 46
 ```
 
 ## NEONの組み込み関数を使う
@@ -180,23 +203,23 @@ ARM NEON Intrinsics (https://gcc.gnu.org/onlinedocs/gcc-4.3.2/gcc/ARM-NEON-Intri
 
 void add_emb()
 {
-	uint8_t a[8];
-	uint8_t b[8];
+	uint8_t a[8];	// d0
+	uint8_t b[8];	// d1
 	uint8_t c[8];	// result
-	memset(a, 0x11, sizeof(a));
+	memset(a, 0x12, sizeof(a));
 	a[2] = 0xEE;	// 飽和確認用
-	memset(b, 0x22, sizeof(b));
+	memset(b, 0x34, sizeof(b));
 	memset(c, 0x00, sizeof(c));
 
-	printf("%08X_%08X\n%08X_%08X\n\n", *(uint32_t*)&a[4], *(uint32_t*)&a[0], *(uint32_t*)&b[4], *(uint32_t*)&b[0]);
-	
 	uint8x8_t va, vb, vc;		// 8-bit(uint8_t) x 8レーン
 	va = vld1_u8(a);
 	vb = vld1_u8(b);
 	vc = vqadd_u8(va, vb);
 	vst1_u8(c, vc);
 
-	printf("%08X_%08X\n", *(uint32_t*)&c[4], *(uint32_t*)&c[0]);
+	for (int i = 0; i < 8; i++)
+		printf("%02X + %02X = %02X\n", a[i], b[i], c[i]);
+
 	return;
 }
 
@@ -209,10 +232,14 @@ int main()
 ```sh:ビルドコマンドと実行結果
 gcc simd.c -mfpu=neon
 ./a.out
-11111111_11EE1111
-22222222_22222222
-
-33333333_33FF3333
+12 + 34 = 46
+12 + 34 = 46
+EE + 34 = FF
+12 + 34 = 46
+12 + 34 = 46
+12 + 34 = 46
+12 + 34 = 46
+12 + 34 = 46
 ```
 
 ## コンパイラに任せる
