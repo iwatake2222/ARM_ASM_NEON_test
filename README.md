@@ -1,5 +1,4 @@
-#ARMアセンブリ言語の実装色々とNEON命令のサンプル
-
+# ARMアセンブリ言語の実装色々とNEON命令のサンプル
 Raspberry Pi 2 (Raspbian stretch)で動作確認
 
 # ARMアセンブリ言語
@@ -11,7 +10,7 @@ Raspberry Pi 2 (Raspbian stretch)で動作確認
 - アセンブラ (Assembler): アセンブリ言語をマシン語に変換するプログラム
 - アセンブル (Assemble): 動詞
 
-例: アセンブリコード(*.s)をアセンブラ(ar)でアセンブルする。
+例: アセンブリコード(*.s)をアセンブラ(as)でアセンブルする。
 
 ## 独立したアセンブリコードファイルを使う
 ```asm:sub.s
@@ -22,6 +21,8 @@ Raspberry Pi 2 (Raspbian stretch)で動作確認
 func1:
 	mov r1, #99
 	str r1, [r0]	@ r0 is the first arg
+	mov r0, #88
+	bx	lr
 	.end
 ```
 
@@ -30,9 +31,10 @@ func1:
 int main()
 {
 	int a;
-	extern void func1(int *a);
-	func1(&a);
-	printf("a = %d\n", a);
+	int ret;
+	extern int func1(int *a);
+	ret = func1(&a);
+	printf("ret = %d, a = %d\n", ret, a);
 }
 ```
 
@@ -40,7 +42,7 @@ int main()
 as -o sub.o sub.s
 gcc call.c sub.o
 ./a.out
-a = 99
+ret = 88, a = 99
 ```
 
 ### 注意
@@ -123,6 +125,8 @@ NEONユニットは32本の64-bit SIMDレジスタ(D0-D31)を持つ。16本x128-
 
 ```c:simd.c
 #include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 
 void add()
 {
@@ -166,8 +170,12 @@ gcc simd.c -mfpu=neon
 ```
 
 ## NEONの組み込み関数を使う
+ARM NEON Intrinsics (https://gcc.gnu.org/onlinedocs/gcc-4.3.2/gcc/ARM-NEON-Intrinsics.html)
+
 ```c:simd.c
 #include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 #include <arm_neon.h>
 
 void add_emb()
@@ -242,10 +250,12 @@ more simd_auto.s
 
 最適化オプション(`-O3`)がないとNEON命令が使われなかった。`-O2`でもダメ。
 
-# 注意
+# その他
 - gccビルド時に`-march=native`オプションがあった方がいいかも
+- `vld1.8`や`vld1_u8()`の1って何? 
+    - Interleave pattern。数字には1,2,3,4が設定できる。指定間隔で飛び飛びでload/storeができるの。例えば3を設定したら、RGBR GBRG BRGBという並びを、RRRR GGGG BBBBにして計算しやすくできる。
+    - https://community.arm.com/processors/b/blog/posts/coding-for-neon---part-1-load-and-stores
 
-
-# 参照
+# 参考
 https://www.aps-web.jp/academy/ca/14/
-(↑図が分かりやすい。けど、ここでの説明はGCCじゃなくてARM製コンパイラを前提にしているっぽいので、コマンドは微妙に異なるので注意)
+(↑図が分かりやすい。けど、こちらの記事はGCCじゃなくてARM製コンパイラを前提にしているっぽいので、コマンドは微妙に異なるので注意)

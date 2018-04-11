@@ -3,9 +3,10 @@
 int main()
 {
 	int a;
-	extern void func1(int *a);
-	func1(&a);
-	printf("a = %d\n", a);
+	int ret;
+	extern int func1(int *a);
+	ret = func1(&a);
+	printf("ret = %d, a = %d\n", ret, a);
 }
 
 /*
